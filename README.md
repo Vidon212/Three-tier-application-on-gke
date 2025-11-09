@@ -8,26 +8,24 @@ flowchart LR
   AR[(Artifact Registry)]
   Jenkins[Jenkins Pipeline]
 
-  Browser -->|HTTP/HTTPS| FrontLB[Service: LoadBalancer\nfrontend]
+  Browser -->|HTTP/HTTPS| FrontLB[Service: LoadBalancer<br/>frontend]
 
-  subgraph "GKE Cluster"
-    subgraph "Namespace: three-tier-app"
-      FrontLB --> FE[Deployment: frontend (Nginx)]
-      FE -->|/api/*| BEsvc[Service: ClusterIP\nbackend]
-      BEsvc --> BE[Deployment: backend (Express)]
-      BE -->|TCP 5432| PGsvc[Service: ClusterIP\npostgres]
-      PGsvc --> PG[(StatefulSet: postgres\nPVC)]
+  subgraph GKE_Cluster
+    subgraph three_tier_app["Namespace: three-tier-app"]
+      FrontLB --> FE[Deployment: frontend - Nginx]
+      FE -->|/api/*| BEsvc[Service: ClusterIP<br/>backend]
+      BEsvc --> BE[Deployment: backend - Express]
+      BE -->|TCP 5432| PGsvc[Service: ClusterIP<br/>postgres]
+      PGsvc --> PG[StatefulSet: postgres<br/>PVC]
     end
   end
 
-  Jenkins -. build/push/deploy .-> AR
-  AR -. image pull .-> FE
-  AR -. image pull .-> BE
-  Jenkins -. kubectl/apply .-> FE
-  Jenkins -. kubectl/apply .-> BE
-  Jenkins -. kubectl/apply .-> PG
+  Jenkins -.->|build/push/deploy| AR
+  AR -.->|image pull| FE
+  AR -.->|image pull| BE
+  Jenkins -.->|kubectl apply| FE
+  Jenkins -.->|kubectl apply| BE
+  Jenkins -.->|kubectl apply| PG
 ```
 
 The browser talks to the public `LoadBalancer` service for the frontend, which serves the static UI and proxies `/api/*` to the backend service. The backend connects to PostgreSQL via the cluster-internal `ClusterIP` service. Jenkins builds and pushes Docker images to Artifact Registry and applies Kubernetes manifests to update deployments.
-
-
