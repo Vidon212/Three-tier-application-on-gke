@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three-tier App on GKE</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            margin: 2rem;
+            color: #222;
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        form {
+            margin-bottom: 1rem;
+        }
+
+        input[type="text"] {
+            padding: 0.5rem;
+            width: 280px;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+        }
+
+        .item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .muted {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .ok {
+            color: #0a0;
+        }
+
+        .err {
+            color: #c00;
+        }
+
+        .card {
+            border: 1px solid #eee;
+            padding: 1rem;
+            border-radius: 8px;
+            max-width: 720px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Three-tier App on GKE</h1>
+    <div class="card">
+        <p class="muted">Frontend (Nginx) → Backend (Express) → Data (PostgreSQL)</p>
+        <div id="health" class="muted">Checking backend health…</div>
+        <form id="form">
+            <input id="name" type="text" placeholder="Enter an item (e.g., Hello GKE)" required />
+            <button type="submit">Add</button>
+        </form>
+        <div id="list"></div>
+    </div>
+    <script>
+        const healthEl = document.getElementById('health');
+        const form = document.getElementById('form');
+        const input = document.getElementById('name');
+        const listEl = document.getElementById('list');
+
+        async function checkHealth() {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    healthEl.textContent = 'Backend: healthy';
+                    healthEl.className = 'ok';
+                } else {
+                    healthEl.textContent = 'Backend: error';
+                    healthEl.className = 'err';
+                }
+            } catch (e) {
+                healthEl.textContent = 'Backend: unreachable';
+                healthEl.className = 'err';
+            }
+        }
+
+        async function loadItems() {
+            listEl.innerHTML = '';
+            try {
+                const res = await fetch('/api/items');
+                const data = await res.json();
+                if (!Array.isArray(data)) throw new Error('Invalid response');
+                if (data.length === 0) {
+                    listEl.innerHTML = '<div class="muted">No items yet. Add one above.</div>';
+                    return;
+                }
+                data.forEach((row) => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    const when = new Date(row.created_at).toLocaleString();
+                    div.textContent = `${row.id}. ${row.name} — ${when}`;
+                    listEl.appendChild(div);
+                });
+            } catch (e) {
+                listEl.innerHTML = `<div class="err">Failed to load items: ${e.message}</div>`;
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = input.value.trim();
+            if (!name) return;
+            try {
+                const res = await fetch('/api/items', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                input.value = '';
+                await loadItems();
+            } catch (e) {
+                alert('Failed to add item: ' + e.message);
+            }
+        });
+
+        (async function init() {
+            await checkHealth();
+            await loadItems();
+        })();
+    </script>
+</body>
+
+</html>
